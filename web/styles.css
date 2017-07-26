@@ -1,0 +1,17 @@
+@import url(https://fonts.googleapis.com/css?family=Roboto);
+
+html, body, .stage--fullscreen {
+    width: 100%;
+    height: 100%;
+    margin: 0;
+    padding: 0;
+    border: 0;
+}
+
+#tool-r {
+    display: inline-block;
+    position: absolute;
+    top: 0;
+    left: 0;
+    z-index: 10;
+}
