@@ -12,27 +12,29 @@ void main() {
   final WINDOW_HEIGHT = html.window.innerHeight;
   print('Window width $WINDOW_WIDTH and height $WINDOW_HEIGHT');
 
-  final STAGE_WIDTH = 150;
+  final STAGE_WIDTH = 300;
   final STAGE_HEIGHT = (STAGE_WIDTH * WINDOW_HEIGHT / WINDOW_WIDTH).ceil();
 
-  sxl.StageOptions options = new sxl.StageOptions()
-    ..backgroundColor = sxl.Color.Tomato
-    ..antialias = true
-    ..stageScaleMode = sxl.StageScaleMode.SHOW_ALL
-    ..stageAlign = sxl.StageAlign.NONE
-    ..renderEngine = sxl.RenderEngine.WebGL;
+  html.CanvasElement canvas = (html.querySelector('#stage') as html.CanvasElement);
+  canvas.height = STAGE_HEIGHT;
+  canvas.width = STAGE_WIDTH;
 
-  var canvas = html.querySelector('#stage');
-  var stage = new sxl.Stage(canvas, width: STAGE_WIDTH, height: STAGE_HEIGHT, options: options);
-  var renderLoop = new sxl.RenderLoop();
-  renderLoop.addStage(stage);
+  // sxl.StageOptions options = new sxl.StageOptions()
+  //   ..backgroundColor = sxl.Color.Tomato
+  //   ..antialias = true
+  //   ..stageScaleMode = sxl.StageScaleMode.SHOW_ALL
+  //   ..stageAlign = sxl.StageAlign.NONE
+  //   ..renderEngine = sxl.RenderEngine.Canvas2D;
+  //var stage = new sxl.Stage(canvas, width: STAGE_WIDTH, height: STAGE_HEIGHT, options: options);
+  //var renderLoop = new sxl.RenderLoop();
+  //renderLoop.addStage(stage);
 
-  CellularPainter painter = new CellularPainter(stage);
+  CellularPainter painter = new CellularPainter(null, canvas);
   html.querySelector('#tool-r').onClick.listen((evt) {
     if (painter != null) {
       painter.stopAndClear();
     }
-    painter = new CellularPainter(stage);
+    painter = new CellularPainter(null, canvas);
   });
 
   html.querySelector('#tool-s').onClick.listen((evt) {
@@ -48,47 +50,54 @@ class CellularPainter {
   final sxl.Stage _stage;
   sxl.BitmapDataUpdateBatch _canvasBitmapDataBuffer;
 
+  final html.CanvasElement _canvas;
+  final html.CanvasRenderingContext2D _canvasCtx;
+
   CellularEffectCalculator _cellularEffectCalculator;
 
   int _STAGE_WIDTH, _STAGE_HEIGHT;
 
   bool _isStopped = false;
 
-  CellularPainter(this._stage) {
+  CellularPainter(this._stage, this._canvas) : 
+    _canvasCtx = (_canvas.getContext('2d') as html.CanvasRenderingContext2D) {
     // this has the size of the canvas
     //_STAGE_WIDTH = this._stage.stageWidth;
     //_STAGE_HEIGHT = this._stage.stageHeight;
-    _STAGE_WIDTH = this._stage.contentRectangle.width.floor();
-    _STAGE_HEIGHT = this._stage.contentRectangle.height.floor();
-    print('Stage contentRectangle width $_STAGE_WIDTH and height $_STAGE_HEIGHT');
+    //_STAGE_WIDTH = this._stage.contentRectangle.width.floor();
+    //_STAGE_HEIGHT = this._stage.contentRectangle.height.floor();
+    //print('Stage contentRectangle width $_STAGE_WIDTH and height $_STAGE_HEIGHT');
+    _STAGE_WIDTH = _canvas.width;
+    _STAGE_HEIGHT = _canvas.height;
+    print('Canvas width $_STAGE_WIDTH and height $_STAGE_HEIGHT');
 
-    sxl.BitmapData canvasBitmapData =
-        new sxl.BitmapData(_STAGE_WIDTH, _STAGE_HEIGHT);
-    _canvasBitmapDataBuffer = new sxl.BitmapDataUpdateBatch(canvasBitmapData);
-    sxl.Bitmap drawingCache = new sxl.Bitmap(canvasBitmapData);
-    drawingCache.addTo(_stage);
+    // sxl.BitmapData canvasBitmapData =
+    //     new sxl.BitmapData(_STAGE_WIDTH, _STAGE_HEIGHT);
+    // _canvasBitmapDataBuffer = new sxl.BitmapDataUpdateBatch(canvasBitmapData);
+    // sxl.Bitmap drawingCache = new sxl.Bitmap(canvasBitmapData);
+    // drawingCache.addTo(_stage);
+    // Get BitmapData from canvas hint
+    //var canvasRenderTexture = new sxl.RenderTexture.fromCanvasElement(_canvas);
+    //new sxl.BitmapData.fromRenderTextureQuad(canvasRenderTexture.quad.withPixelRatio(1.0));
 
     _cellularEffectCalculator = new CellularEffectCalculator(_STAGE_WIDTH, _STAGE_HEIGHT);
 
     run();
   }
 
-  int _x = 0;
-
   void _tickUpdate(num delta) {
-    print('Tick: $delta');
+    //print('Tick: $delta');
     if (_isStopped) return;
     // TICK UPDATE START
 
-    if (_x > _STAGE_WIDTH) {
-      print('finished!');
-      return;
-    }
-    //for (var end = _x + 10; _x < end; _x++) {
-    //  _canvasBitmapDataBuffer.setPixel32(_x, 10, sxl.Color.CadetBlue);
-    //}
-    _cellularEffectCalculator.nextTick(_canvasBitmapDataBuffer);
-    _canvasBitmapDataBuffer.update();
+    html.ImageData imgData = _canvasCtx.getImageData(0, 0, _canvas.width, _canvas.height);
+    
+    _cellularEffectCalculator.nextTick(imgData);
+
+    _canvasCtx.putImageData(imgData, 0, 0);
+
+    //_cellularEffectCalculator.nextTick(_canvasBitmapDataBuffer);
+    //_canvasBitmapDataBuffer.update();
 
     // TICK UPDATE END
     run();
@@ -100,7 +109,9 @@ class CellularPainter {
 
   void stopAndClear() {
     _isStopped = true;
-    _stage.removeChildren();
+    if (_stage != null) {
+      _stage.removeChildren();
+    }
   }
 }
 
@@ -155,10 +166,12 @@ class CellularEffectCalculator {
   final _GRID_BOTTOMMOST;
 
   Stopwatch _stopwatch = new Stopwatch();
+  Stopwatch _stopwatch2 = new Stopwatch();
 
   List<Cell>_cells;
 
-  //Uint8ClampedList _arrayBuffer;
+  Uint8ClampedList _arrayBuffer;
+  Uint32List _rgbData;
 
   CellularEffectCalculator(this._GRID_WIDTH, this._GRID_HEIGHT)
       : _CELL_WIDTH = 1,
@@ -168,7 +181,8 @@ class CellularEffectCalculator {
         _GRID_BOTTOMMOST = _GRID_HEIGHT - 1 {
     _initCells();
     // buffer to hold the output
-    //_arrayBuffer = new Uint8ClampedList(_TOTAL_CELLS*4);
+    _arrayBuffer = new Uint8ClampedList(_TOTAL_CELLS*4);
+    _rgbData = new Uint32List.view(_arrayBuffer.buffer);
   }
 
   List<int> _calculateNeighbors(int x, y) {
@@ -238,8 +252,8 @@ class CellularEffectCalculator {
     }
   }
 
-  void nextTick(sxl.BitmapDataUpdateBatch canvasBitmapDataBuffer) {
-    print('nextTick()::');
+  void nextTick(html.ImageData imageData) {
+    //print('nextTick()::');
     _stopwatch.reset();
     _stopwatch.start();
 
@@ -306,41 +320,33 @@ class CellularEffectCalculator {
       ensureColorBounds(cell);
     }); // end for each cell
 
-    _stopwatch.stop();
-    print('nextTick()::calc:: ${_stopwatch.elapsedMilliseconds}ms');
+    //_stopwatch.stop();
+    //print('nextTick()::calc:: ${_stopwatch.elapsedMilliseconds}ms');
 
-    _stopwatch.reset(); _stopwatch.start();
+    // _stopwatch.reset(); _stopwatch.start();
+    // _stopwatch2.reset(); _stopwatch2.start();
+    Cell cell;
+    for (var idx=0; idx<_TOTAL_CELLS; idx++) {
+      cell = _cells[idx];
 
-    // Copy buffer values into primary!
-    int idx = 0;
-    _cells.forEach((cell) {
+      //_stopwatch2.start();
+      // Copy buffer values into primary!
       cell.r = cell.bufferR;
       cell.g = cell.bufferG;
       cell.b = cell.bufferB;
       cell.rVel = cell.bufferRVel;
       cell.gVel = cell.bufferGVel;
       cell.bVel = cell.bufferBVel;
+      //_stopwatch2.stop();
 
-      idx++;
-    });
+      // Copy data to output
+      _rgbData[idx] = 0xFF000000 | (cell.r.toInt() << 16) | (cell.g.toInt() << 8) | (cell.b.toInt());
+    };
+    imageData.data.setAll(0, _arrayBuffer);
+
     _stopwatch.stop();
-    print('nextTick()::copy:: ${_stopwatch.elapsedMilliseconds}ms');
-
-    _stopwatch.reset(); _stopwatch.start();
-    // Copy buffer values into primary!
-    idx = 0;
-    _cells.forEach((cell) {
-      // TODO extract this from this class
-      //int color = int.parse('0xFF${cell.r.toInt().toRadixString(16)}${cell.g.toInt().toRadixString(16)}${cell.b.toInt().toRadixString(16)}');
-      int color = 0xFF000000 | (cell.r.toInt() << 16) | (cell.g.toInt() << 8) | (cell.b.toInt());
-      canvasBitmapDataBuffer.setPixel32(idx % _GRID_WIDTH, idx ~/ _GRID_WIDTH, color);
-
-      idx++;
-    });
-    _stopwatch.stop();
-    print('nextTick()::setpixel:: ${_stopwatch.elapsedMilliseconds}ms');
-
-    //_stopwatch.stop();
-    //print('nextTick()::copy+setpixel:: ${_stopwatch.elapsedMilliseconds}ms');
+    //print('nextTick()::copy:: ${_stopwatch2.elapsedMilliseconds}ms');
+    //print('nextTick()::copy+setpixel+imgData.setAll:: ${_stopwatch.elapsedMilliseconds}ms');
+    print('nextTick()::total:: ${_stopwatch.elapsedMilliseconds}ms');
   }
 }
