@@ -1,7 +1,6 @@
 // Copyright (c) 2017, Lambros Petrou. All rights reserved. Use of this source code
 // is governed by a BSD-style license that can be found in the LICENSE file.
 
-import 'dart:async';
 import 'dart:math';
 import 'dart:html' as html;
 import 'dart:typed_data';
@@ -11,12 +10,20 @@ class RequestConfig {
   int _width;
   int _height;
 
-  RequestConfig.fromURL(Uri uri) : _width = -1, _height = -1 {
-    if (!uri.hasQuery) {return;}
-    
+  RequestConfig.fromURL(Uri uri)
+      : _width = -1,
+        _height = -1 {
+    if (!uri.hasQuery) {
+      return;
+    }
+
     Map<String, String> qps = uri.queryParameters;
-    if (qps['w'] != null) { _width = int.parse(qps['w']); }
-    if (qps['h'] != null) { _height = int.parse(qps['h']); }
+    if (qps['w'] != null) {
+      _width = int.parse(qps['w']);
+    }
+    if (qps['h'] != null) {
+      _height = int.parse(qps['h']);
+    }
   }
 
   int width(int withDefault) {
@@ -25,6 +32,7 @@ class RequestConfig {
     }
     return _width;
   }
+
   int height(int withDefault) {
     if (_height < 0) {
       return withDefault;
@@ -40,12 +48,15 @@ void main() {
 
   print(html.window.location.toString());
 
-  RequestConfig config = new RequestConfig.fromURL(Uri.parse(html.window.location.toString()));
+  RequestConfig config =
+      new RequestConfig.fromURL(Uri.parse(html.window.location.toString()));
 
   final STAGE_WIDTH = config.width(150);
-  final STAGE_HEIGHT = config.height((STAGE_WIDTH * WINDOW_HEIGHT / WINDOW_WIDTH).ceil());
+  final STAGE_HEIGHT =
+      config.height((STAGE_WIDTH * WINDOW_HEIGHT / WINDOW_WIDTH).ceil());
 
-  html.CanvasElement canvas = (html.querySelector('#stage') as html.CanvasElement);
+  html.CanvasElement canvas =
+      (html.querySelector('#stage') as html.CanvasElement);
   canvas.height = STAGE_HEIGHT;
   canvas.width = STAGE_WIDTH;
 
@@ -73,7 +84,6 @@ void main() {
       painter = null;
     }
   });
-
 }
 
 class CellularPainter {
@@ -89,8 +99,9 @@ class CellularPainter {
 
   bool _isStopped = false;
 
-  CellularPainter(this._stage, this._canvas) : 
-    _canvasCtx = (_canvas.getContext('2d') as html.CanvasRenderingContext2D) {
+  CellularPainter(this._stage, this._canvas)
+      : _canvasCtx =
+            (_canvas.getContext('2d') as html.CanvasRenderingContext2D) {
     // this has the size of the canvas
     //_STAGE_WIDTH = this._stage.stageWidth;
     //_STAGE_HEIGHT = this._stage.stageHeight;
@@ -110,7 +121,8 @@ class CellularPainter {
     //var canvasRenderTexture = new sxl.RenderTexture.fromCanvasElement(_canvas);
     //new sxl.BitmapData.fromRenderTextureQuad(canvasRenderTexture.quad.withPixelRatio(1.0));
 
-    _cellularEffectCalculator = new CellularEffectCalculator(_STAGE_WIDTH, _STAGE_HEIGHT);
+    _cellularEffectCalculator =
+        new CellularEffectCalculator(_STAGE_WIDTH, _STAGE_HEIGHT);
 
     run();
   }
@@ -120,8 +132,9 @@ class CellularPainter {
     if (_isStopped) return;
     // TICK UPDATE START
 
-    html.ImageData imgData = _canvasCtx.getImageData(0, 0, _canvas.width, _canvas.height);
-    
+    html.ImageData imgData =
+        _canvasCtx.getImageData(0, 0, _canvas.width, _canvas.height);
+
     _cellularEffectCalculator.nextTick(imgData);
 
     _canvasCtx.putImageData(imgData, 0, 0);
@@ -149,32 +162,26 @@ class Cell {
   double r, g, b;
   double rVel, gVel, bVel;
 
-  double bufferR, bufferG, bufferB;
-  double bufferRVel, bufferGVel, bufferBVel;
-
   Cell()
       : r = 0.0,
         g = 0.0,
         b = 0.0,
         rVel = 0.0,
         gVel = 0.0,
-        bVel = 0.0,
-        bufferR = 0.0,
-        bufferG = 0.0,
-        bufferB = 0.0,
-        bufferRVel = 0.0,
-        bufferGVel = 0.0,
-        bufferBVel = 0.0 {}
+        bVel = 0.0 {}
   Cell.fromRGB(this.r, this.g, this.b)
       : rVel = 0.0,
         gVel = 0.0,
-        bVel = 0.0,
-        bufferR = r,
-        bufferG = g,
-        bufferB = b,
-        bufferRVel = 0.0,
-        bufferGVel = 0.0,
-        bufferBVel = 0.0 {}
+        bVel = 0.0 {}
+
+  static void copy(Cell to, Cell from) {
+    to.r = from.r;
+    to.g = from.g;
+    to.b = from.b;
+    to.rVel = from.rVel;
+    to.gVel = from.gVel;
+    to.bVel = from.bVel;
+  }
 }
 
 class CellularEffectCalculator {
@@ -186,8 +193,6 @@ class CellularEffectCalculator {
 
   final _GRID_WIDTH;
   final _GRID_HEIGHT;
-  final _CELL_WIDTH;
-  final _CELL_HEIGHT;
   final _TOTAL_CELLS;
 
   final _GRID_RIGHTMOST;
@@ -196,21 +201,20 @@ class CellularEffectCalculator {
   Stopwatch _stopwatch = new Stopwatch();
   Stopwatch _stopwatch2 = new Stopwatch();
 
-  List<Cell>_cells;
+  List<Cell> _cells;
+  List<Cell> _bufferCells;
   List<List<int>> _neighborsIndex;
 
   Uint8ClampedList _arrayBuffer;
   Uint32List _rgbData;
 
   CellularEffectCalculator(this._GRID_WIDTH, this._GRID_HEIGHT)
-      : _CELL_WIDTH = 1,
-        _CELL_HEIGHT = 1,
-        _TOTAL_CELLS = _GRID_WIDTH * _GRID_HEIGHT,
+      : _TOTAL_CELLS = _GRID_WIDTH * _GRID_HEIGHT,
         _GRID_RIGHTMOST = _GRID_WIDTH - 1,
         _GRID_BOTTOMMOST = _GRID_HEIGHT - 1 {
     _initCells();
     // buffer to hold the output
-    _arrayBuffer = new Uint8ClampedList(_TOTAL_CELLS*4);
+    _arrayBuffer = new Uint8ClampedList(_TOTAL_CELLS * 4);
     _rgbData = new Uint32List.view(_arrayBuffer.buffer);
   }
 
@@ -233,52 +237,44 @@ class CellularEffectCalculator {
 
   void _initCells() {
     _cells = new List<Cell>();
+    _bufferCells = new List<Cell>();
     _neighborsIndex = new List<List<int>>();
 
     Random random = new Random();
     for (int y = 0; y < _GRID_HEIGHT; y++) {
       for (int x = 0; x < _GRID_WIDTH; x++) {
-        Cell cell = new Cell.fromRGB(random.nextDouble() * 255,
-            random.nextDouble() * 255, random.nextDouble() * 255);
-        _cells.add(cell);
+        var r = random.nextDouble(),
+            g = random.nextDouble(),
+            b = random.nextDouble();
+        _cells.add(new Cell.fromRGB(r * 255, g * 255, b * 255));
+        _bufferCells.add(new Cell.fromRGB(r * 255, g * 255, b * 255));
         _neighborsIndex.add(_calculateNeighbors(x, y));
       }
     }
   }
 
-  void resetCells() {
-    Random random = new Random();
-    _cells.forEach((cell) {
-      cell.r = cell.bufferR = random.nextDouble() * 255;
-      cell.g = cell.bufferG = random.nextDouble() * 255;
-      cell.b = cell.bufferB = random.nextDouble() * 255;
-      cell.rVel = cell.gVel = cell.bVel = 0.0;
-      cell.bufferRVel = cell.bufferGVel = cell.bufferBVel = 0.0;
-    });
-  }
-
   void ensureColorBounds(Cell cell) {
     //bounce colors off of color cube boundaries
-    if (cell.bufferR < 0) {
-      cell.bufferR = 0.0;
-      cell.bufferRVel *= -1;
-    } else if (cell.bufferR > 255) {
-      cell.bufferR = 255.0;
-      cell.bufferRVel *= -1;
+    if (cell.r < 0) {
+      cell.r = 0.0;
+      cell.rVel *= -1;
+    } else if (cell.r > 255) {
+      cell.r = 255.0;
+      cell.rVel *= -1;
     }
-    if (cell.bufferG < 0) {
-      cell.bufferG = 0.0;
-      cell.bufferGVel *= -1;
-    } else if (cell.bufferG > 255) {
-      cell.bufferG = 255.0;
-      cell.bufferGVel *= -1;
+    if (cell.g < 0) {
+      cell.g = 0.0;
+      cell.gVel *= -1;
+    } else if (cell.g > 255) {
+      cell.g = 255.0;
+      cell.gVel *= -1;
     }
-    if (cell.bufferB < 0) {
-      cell.bufferB = 0.0;
-      cell.bufferBVel *= -1;
-    } else if (cell.bufferB > 255) {
-      cell.bufferB = 255.0;
-      cell.bufferBVel *= -1;
+    if (cell.b < 0) {
+      cell.b = 0.0;
+      cell.bVel *= -1;
+    } else if (cell.b > 255) {
+      cell.b = 255.0;
+      cell.bVel *= -1;
     }
   }
 
@@ -336,60 +332,62 @@ class CellularEffectCalculator {
         bSep *= sepMagRecip;
       }
 
-
+      Cell bufferCell = _bufferCells[idx];
       //Update velocity by combining separation, alignment and cohesion effects. Change velocity only by 'ease' ratio.
-      cell.bufferRVel = cell.rVel + (ease * (rSep + rVelAve + rAve - cell.r - cell.rVel));
-      cell.bufferGVel = cell.gVel + (ease * (gSep + gVelAve + gAve - cell.g - cell.gVel));
-      cell.bufferBVel = cell.bVel + (ease * (bSep + bVelAve + bAve - cell.b - cell.bVel));
+      bufferCell.rVel =
+          cell.rVel + (ease * (rSep + rVelAve + rAve - cell.r - cell.rVel));
+      bufferCell.gVel =
+          cell.gVel + (ease * (gSep + gVelAve + gAve - cell.g - cell.gVel));
+      bufferCell.bVel =
+          cell.bVel + (ease * (bSep + bVelAve + bAve - cell.b - cell.bVel));
 
       //update colors according to color velocities
-      cell.bufferR = cell.r + cell.bufferRVel;
-      cell.bufferG = cell.g + cell.bufferGVel;
-      cell.bufferB = cell.b + cell.bufferBVel;
+      bufferCell.r = cell.r + bufferCell.rVel;
+      bufferCell.g = cell.g + bufferCell.gVel;
+      bufferCell.b = cell.b + bufferCell.bVel;
 
 /*
+      Cell bufferCell = _bufferCells[idx];
       //Update velocity by combining separation, alignment and cohesion effects. Change velocity only by 'ease' ratio.
-      cell.bufferRVel +=
-          ease * (rSep + rVelAve + rAve - cell.r - cell.bufferRVel);
-      cell.bufferGVel +=
-          ease * (gSep + gVelAve + gAve - cell.g - cell.bufferGVel);
-      cell.bufferBVel +=
-          ease * (bSep + bVelAve + bAve - cell.b - cell.bufferBVel);
+      bufferCell.rVel = cell.rVel + (ease * (rSep + rVelAve + rAve - cell.r - bufferCell.rVel));
+      bufferCell.gVel = cell.gVel + (ease * (gSep + gVelAve + gAve - cell.g - bufferCell.gVel));
+      bufferCell.bVel = cell.bVel + (ease * (bSep + bVelAve + bAve - cell.b - bufferCell.bVel));
 
       //update colors according to color velocities
-      cell.bufferR += cell.bufferRVel;
-      cell.bufferG += cell.bufferGVel;
-      cell.bufferB += cell.bufferBVel;
+      bufferCell.r += bufferCell.rVel;
+      bufferCell.g += bufferCell.gVel;
+      bufferCell.b += bufferCell.bVel;
 */
-      ensureColorBounds(cell);
+      ensureColorBounds(bufferCell);
     }); // end for each cell
 
     //_stopwatch.stop();
     //print('nextTick()::calc:: ${_stopwatch.elapsedMilliseconds}ms');
 
     // _stopwatch.reset(); _stopwatch.start();
-    // _stopwatch2.reset(); _stopwatch2.start();
     Cell cell;
-    for (var idx=0; idx<_TOTAL_CELLS; idx++) {
+    //Cell bufferCell;
+    for (var idx = 0; idx < _TOTAL_CELLS; idx++) {
       cell = _cells[idx];
+      //bufferCell = _bufferCells[idx];
 
-      //_stopwatch2.start();
       // Copy buffer values into primary!
-      cell.r = cell.bufferR;
-      cell.g = cell.bufferG;
-      cell.b = cell.bufferB;
-      cell.rVel = cell.bufferRVel;
-      cell.gVel = cell.bufferGVel;
-      cell.bVel = cell.bufferBVel;
-      //_stopwatch2.stop();
+      //Cell.copy(cell, bufferCell);
 
       // Copy data to output
-      _rgbData[idx] = 0xFF000000 | (cell.r.toInt() << 16) | (cell.g.toInt() << 8) | (cell.b.toInt());
-    };
+      _rgbData[idx] = 0xFF000000 |
+          (cell.r.toInt() << 16) |
+          (cell.g.toInt() << 8) |
+          (cell.b.toInt());
+    }
+    ;
     imageData.data.setAll(0, _arrayBuffer);
 
+    List tmp = _cells;
+    _cells = _bufferCells;
+    _bufferCells = tmp;
+
     _stopwatch.stop();
-    //print('nextTick()::copy:: ${_stopwatch2.elapsedMilliseconds}ms');
     //print('nextTick()::copy+setpixel+imgData.setAll:: ${_stopwatch.elapsedMilliseconds}ms');
     print('nextTick()::total:: ${_stopwatch.elapsedMilliseconds}ms');
   }
