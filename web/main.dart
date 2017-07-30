@@ -4,6 +4,7 @@
 import 'dart:async';
 import 'dart:math';
 import 'dart:html' as html;
+import 'dart:typed_data';
 import 'package:stagexl/stagexl.dart' as sxl;
 
 void main() {
@@ -11,13 +12,13 @@ void main() {
   final WINDOW_HEIGHT = html.window.innerHeight;
   print('Window width $WINDOW_WIDTH and height $WINDOW_HEIGHT');
 
-  final STAGE_WIDTH = 200;
-  final STAGE_HEIGHT = (STAGE_WIDTH * (WINDOW_HEIGHT/WINDOW_WIDTH)).ceil();
+  final STAGE_WIDTH = 150;
+  final STAGE_HEIGHT = (STAGE_WIDTH * WINDOW_HEIGHT / WINDOW_WIDTH).ceil();
 
   sxl.StageOptions options = new sxl.StageOptions()
     ..backgroundColor = sxl.Color.Tomato
     ..antialias = true
-    ..stageScaleMode = sxl.StageScaleMode.NO_BORDER
+    ..stageScaleMode = sxl.StageScaleMode.SHOW_ALL
     ..stageAlign = sxl.StageAlign.NONE
     ..renderEngine = sxl.RenderEngine.WebGL;
 
@@ -153,7 +154,11 @@ class CellularEffectCalculator {
   final _GRID_RIGHTMOST;
   final _GRID_BOTTOMMOST;
 
-  List<Cell> _cells;
+  Stopwatch _stopwatch = new Stopwatch();
+
+  List<Cell>_cells;
+
+  //Uint8ClampedList _arrayBuffer;
 
   CellularEffectCalculator(this._GRID_WIDTH, this._GRID_HEIGHT)
       : _CELL_WIDTH = 1,
@@ -162,6 +167,8 @@ class CellularEffectCalculator {
         _GRID_RIGHTMOST = _GRID_WIDTH - 1,
         _GRID_BOTTOMMOST = _GRID_HEIGHT - 1 {
     _initCells();
+    // buffer to hold the output
+    //_arrayBuffer = new Uint8ClampedList(_TOTAL_CELLS*4);
   }
 
   List<int> _calculateNeighbors(int x, y) {
@@ -233,6 +240,8 @@ class CellularEffectCalculator {
 
   void nextTick(sxl.BitmapDataUpdateBatch canvasBitmapDataBuffer) {
     print('nextTick()::');
+    _stopwatch.reset();
+    _stopwatch.start();
 
     _cells.forEach((cell) {
       double rAve = 0.0,
@@ -297,7 +306,11 @@ class CellularEffectCalculator {
       ensureColorBounds(cell);
     }); // end for each cell
 
-    print('nextTick()::copy+setpixel');
+    _stopwatch.stop();
+    print('nextTick()::calc:: ${_stopwatch.elapsedMilliseconds}ms');
+
+    _stopwatch.reset(); _stopwatch.start();
+
     // Copy buffer values into primary!
     int idx = 0;
     _cells.forEach((cell) {
@@ -308,13 +321,26 @@ class CellularEffectCalculator {
       cell.gVel = cell.bufferGVel;
       cell.bVel = cell.bufferBVel;
 
+      idx++;
+    });
+    _stopwatch.stop();
+    print('nextTick()::copy:: ${_stopwatch.elapsedMilliseconds}ms');
+
+    _stopwatch.reset(); _stopwatch.start();
+    // Copy buffer values into primary!
+    idx = 0;
+    _cells.forEach((cell) {
       // TODO extract this from this class
-      int color = int.parse('0xFF${cell.r.toInt().toRadixString(16)}${cell.g.toInt().toRadixString(16)}${cell.b.toInt().toRadixString(16)}');
+      //int color = int.parse('0xFF${cell.r.toInt().toRadixString(16)}${cell.g.toInt().toRadixString(16)}${cell.b.toInt().toRadixString(16)}');
+      int color = 0xFF000000 | (cell.r.toInt() << 16) | (cell.g.toInt() << 8) | (cell.b.toInt());
       canvasBitmapDataBuffer.setPixel32(idx % _GRID_WIDTH, idx ~/ _GRID_WIDTH, color);
 
       idx++;
     });
-    
-    print('nextTick()::end!');
+    _stopwatch.stop();
+    print('nextTick()::setpixel:: ${_stopwatch.elapsedMilliseconds}ms');
+
+    //_stopwatch.stop();
+    //print('nextTick()::copy+setpixel:: ${_stopwatch.elapsedMilliseconds}ms');
   }
 }
