@@ -152,8 +152,6 @@ class Cell {
   double bufferR, bufferG, bufferB;
   double bufferRVel, bufferGVel, bufferBVel;
 
-  List<int> neighborsIndex;
-
   Cell()
       : r = 0.0,
         g = 0.0,
@@ -199,6 +197,7 @@ class CellularEffectCalculator {
   Stopwatch _stopwatch2 = new Stopwatch();
 
   List<Cell>_cells;
+  List<List<int>> _neighborsIndex;
 
   Uint8ClampedList _arrayBuffer;
   Uint32List _rgbData;
@@ -234,14 +233,15 @@ class CellularEffectCalculator {
 
   void _initCells() {
     _cells = new List<Cell>();
+    _neighborsIndex = new List<List<int>>();
 
     Random random = new Random();
     for (int y = 0; y < _GRID_HEIGHT; y++) {
       for (int x = 0; x < _GRID_WIDTH; x++) {
         Cell cell = new Cell.fromRGB(random.nextDouble() * 255,
             random.nextDouble() * 255, random.nextDouble() * 255);
-        cell.neighborsIndex = _calculateNeighbors(x, y);
         _cells.add(cell);
+        _neighborsIndex.add(_calculateNeighbors(x, y));
       }
     }
   }
@@ -287,7 +287,9 @@ class CellularEffectCalculator {
     _stopwatch.reset();
     _stopwatch.start();
 
+    int idx = -1;
     _cells.forEach((cell) {
+      idx++;
       double rAve = 0.0,
           gAve = 0.0,
           bAve = 0.0,
@@ -299,7 +301,7 @@ class CellularEffectCalculator {
           bSep = 0.0;
       double dr, dg, db;
 
-      cell.neighborsIndex.forEach((nidx) {
+      _neighborsIndex[idx].forEach((nidx) {
         Cell neighbor = _cells[nidx];
         rAve += neighbor.r;
         gAve += neighbor.g;
@@ -317,7 +319,7 @@ class CellularEffectCalculator {
         }
       });
 
-      double f = 1 / cell.neighborsIndex.length;
+      double f = 1 / _neighborsIndex[idx].length;
       rAve *= f;
       gAve *= f;
       bAve *= f;
@@ -334,6 +336,18 @@ class CellularEffectCalculator {
         bSep *= sepMagRecip;
       }
 
+
+      //Update velocity by combining separation, alignment and cohesion effects. Change velocity only by 'ease' ratio.
+      cell.bufferRVel = cell.rVel + (ease * (rSep + rVelAve + rAve - cell.r - cell.rVel));
+      cell.bufferGVel = cell.gVel + (ease * (gSep + gVelAve + gAve - cell.g - cell.gVel));
+      cell.bufferBVel = cell.bVel + (ease * (bSep + bVelAve + bAve - cell.b - cell.bVel));
+
+      //update colors according to color velocities
+      cell.bufferR = cell.r + cell.bufferRVel;
+      cell.bufferG = cell.g + cell.bufferGVel;
+      cell.bufferB = cell.b + cell.bufferBVel;
+
+/*
       //Update velocity by combining separation, alignment and cohesion effects. Change velocity only by 'ease' ratio.
       cell.bufferRVel +=
           ease * (rSep + rVelAve + rAve - cell.r - cell.bufferRVel);
@@ -346,7 +360,7 @@ class CellularEffectCalculator {
       cell.bufferR += cell.bufferRVel;
       cell.bufferG += cell.bufferGVel;
       cell.bufferB += cell.bufferBVel;
-
+*/
       ensureColorBounds(cell);
     }); // end for each cell
 
