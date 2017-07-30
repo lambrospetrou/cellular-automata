@@ -7,13 +7,43 @@ import 'dart:html' as html;
 import 'dart:typed_data';
 import 'package:stagexl/stagexl.dart' as sxl;
 
+class RequestConfig {
+  int _width;
+  int _height;
+
+  RequestConfig.fromURL(Uri uri) : _width = -1, _height = -1 {
+    if (!uri.hasQuery) {return;}
+    
+    Map<String, String> qps = uri.queryParameters;
+    if (qps['w'] != null) { _width = int.parse(qps['w']); }
+    if (qps['h'] != null) { _height = int.parse(qps['h']); }
+  }
+
+  int width(int withDefault) {
+    if (_width < 0) {
+      return withDefault;
+    }
+    return _width;
+  }
+  int height(int withDefault) {
+    if (_height < 0) {
+      return withDefault;
+    }
+    return _height;
+  }
+}
+
 void main() {
   final WINDOW_WIDTH = html.window.innerWidth;
   final WINDOW_HEIGHT = html.window.innerHeight;
   print('Window width $WINDOW_WIDTH and height $WINDOW_HEIGHT');
 
-  final STAGE_WIDTH = 300;
-  final STAGE_HEIGHT = (STAGE_WIDTH * WINDOW_HEIGHT / WINDOW_WIDTH).ceil();
+  print(html.window.location.toString());
+
+  RequestConfig config = new RequestConfig.fromURL(Uri.parse(html.window.location.toString()));
+
+  final STAGE_WIDTH = config.width(150);
+  final STAGE_HEIGHT = config.height((STAGE_WIDTH * WINDOW_HEIGHT / WINDOW_WIDTH).ceil());
 
   html.CanvasElement canvas = (html.querySelector('#stage') as html.CanvasElement);
   canvas.height = STAGE_HEIGHT;
